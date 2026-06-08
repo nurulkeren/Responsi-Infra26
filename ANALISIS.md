@@ -2,132 +2,295 @@ Nama: Nurul Maftuhah
 NIM: H1H024002
 SHIFT: A
 
- Analisis Perbaikan Konfigurasi Docker
+# Analisis Perbaikan
 
-Pada proses implementasi Docker Compose, dilakukan analisis terhadap konfigurasi yang digunakan untuk menjalankan layanan web server, load balancer, dan database. Berdasarkan hasil pemeriksaan, ditemukan beberapa kesalahan konfigurasi yang menyebabkan sebagian container tidak dapat berjalan atau tidak dapat berkomunikasi dengan layanan lainnya.
+## Permasalahan 1
 
-### 1. Kesalahan Penulisan Service Docker Compose
+### Gejala
 
-Pada bagian awal file konfigurasi ditemukan penulisan:
+Docker Compose gagal dijalankan karena file konfigurasi tidak dapat diparsing dengan benar.
 
-```yaml
+### Penyebab
+
+Pada file `docker-compose.yml` ditemukan kesalahan penulisan bagian service, yaitu:
+
+```
 services
 ```
 
-Penulisan tersebut tidak sesuai dengan sintaks Docker Compose karena tidak menggunakan tanda titik dua (`:`). Perbaikan dilakukan dengan mengubahnya menjadi:
+Penulisan tersebut tidak menggunakan tanda titik dua (`:`) sehingga tidak sesuai dengan sintaks Docker Compose.
 
-```yaml
+### Solusi
+
+Konfigurasi diperbaiki menjadi:
+
+```
 services:
 ```
 
-Perbaikan ini diperlukan agar Docker Compose dapat membaca daftar service yang akan dijalankan.
+Setelah diperbaiki, Docker Compose dapat membaca daftar service yang akan dijalankan dengan benar.
 
-### 2. Ketidaksesuaian Nama Host Database
+---
 
-Pada service `web1` ditemukan konfigurasi:
+## Permasalahan 2
 
-```yaml
+### Gejala
+
+Container `web1` tidak dapat terhubung ke database MySQL.
+
+### Penyebab
+
+Pada service `web1` ditemukan konfigurasi hostname database yang tidak sesuai:
+
+```
 DB_HOST: mysql
 ```
 
 Sedangkan service database didefinisikan dengan nama:
 
-```yaml
+```
 db:
 ```
 
-Karena Docker Compose menggunakan nama service sebagai hostname internal, maka hostname yang benar adalah `db`. Oleh karena itu konfigurasi diperbaiki menjadi:
+Docker Compose menggunakan nama service sebagai hostname internal jaringan sehingga hostname yang digunakan harus sesuai dengan nama service yang didefinisikan.
 
-```yaml
+### Solusi
+
+Hostname database diperbaiki menjadi:
+
+```
 DB_HOST: db
 ```
 
-Perbaikan ini memungkinkan aplikasi web terhubung dengan database MySQL yang berada pada container database.
+Setelah diperbaiki, service `web1` dapat terhubung ke database dengan benar.
 
-### 3. Kesalahan Password Database pada Web2
+---
 
-Pada service `web2` ditemukan konfigurasi:
+## Permasalahan 3
 
-```yaml
+### Gejala
+
+Aplikasi pada container `web2` gagal melakukan koneksi ke database.
+
+### Penyebab
+
+Password database yang digunakan pada service `web2` tidak sesuai dengan password database yang sebenarnya.
+
+Konfigurasi yang ditemukan:
+
+```
 DB_PASS: wrongpassword
 ```
 
-Sedangkan password database yang sebenarnya adalah:
+Sedangkan password database yang benar adalah:
 
-```yaml
+```
 MYSQL_PASSWORD: student123
 ```
 
-Ketidaksesuaian password menyebabkan aplikasi gagal melakukan autentikasi ke database. Oleh karena itu password diperbaiki menjadi:
+### Solusi
 
-```yaml
+Password diperbaiki menjadi:
+
+```
 DB_PASS: student123
 ```
 
-Setelah perbaikan, service web2 dapat terhubung dengan database secara normal.
+Setelah perbaikan, service `web2` dapat melakukan autentikasi dan terhubung ke database dengan normal.
 
-### 4. Kesalahan Direktori Build pada Web3
+---
 
-Pada service `web3` ditemukan konfigurasi:
+## Permasalahan 4
 
-```yaml
+### Gejala
+
+Proses build image untuk container `web3` gagal dijalankan.
+
+### Penyebab
+
+Docker Compose tidak dapat menemukan direktori build karena terdapat kesalahan penulisan path:
+
+```
 context: ./web33
 ```
 
-Padahal direktori yang tersedia adalah `web3`. Kesalahan ini menyebabkan proses build image gagal karena Docker tidak dapat menemukan direktori yang dimaksud.
+Padahal direktori yang tersedia adalah:
 
-Perbaikan dilakukan dengan mengubah konfigurasi menjadi:
-
-```yaml
+```
 context: ./web3
 ```
 
-### 5. Kesalahan Konfigurasi Jaringan Web3
+### Solusi
 
-Service `web3` hanya terhubung ke network backend:
+Path build diperbaiki menjadi:
 
-```yaml
+```
+context: ./web3
+```
+
+Setelah diperbaiki, image `web3` berhasil dibangun dan container dapat dijalankan.
+
+---
+
+## Permasalahan 5
+
+### Gejala
+
+Nginx tidak dapat mendistribusikan request ke container `web3`.
+
+### Penyebab
+
+Container `web3` hanya terhubung ke network backend:
+
+```
 networks:
   - backend
 ```
 
-Padahal service tersebut harus dapat menerima request dari Nginx yang berada pada network frontend. Oleh karena itu perlu ditambahkan network frontend:
+Akibatnya container `web3` tidak dapat dijangkau oleh Nginx yang berada pada network frontend.
 
-```yaml
+### Solusi
+
+Konfigurasi network diperbaiki menjadi:
+
+```
 networks:
   - frontend
   - backend
 ```
 
-Perbaikan ini memungkinkan Nginx melakukan load balancing ke web3.
+Setelah perbaikan, Nginx dapat melakukan load balancing ke `web3`.
 
-### 6. Ketidaksesuaian Nama Volume
+---
 
-Pada service database digunakan volume:
+## Permasalahan 6
 
-```yaml
+### Gejala
+
+Volume database tidak dapat digunakan dengan benar dan berpotensi menyebabkan data tidak tersimpan secara persisten.
+
+### Penyebab
+
+Nama volume yang digunakan pada service database berbeda dengan deklarasi volume yang tersedia.
+
+Pada service database:
+
+```
 volumes:
   - db-data:/var/lib/mysql
 ```
 
-Namun pada bagian deklarasi volume dituliskan:
+Sedangkan deklarasi volume:
 
-```yaml
+```
 volumes:
   database-data:
 ```
 
-Karena nama volume harus sama, maka dilakukan perbaikan menjadi:
+### Solusi
 
-```yaml
+Nama volume disamakan menjadi:
+
+```
 volumes:
   db-data:
 ```
 
-Perbaikan ini memastikan data MySQL tersimpan secara persisten dan tidak hilang ketika container dihentikan atau dibuat ulang.
+Setelah diperbaiki, data MySQL dapat tersimpan secara permanen melalui Docker Volume.
 
-### Hasil Perbaikan
+---
 
-Setelah seluruh konfigurasi diperbaiki, seluruh container dapat dijalankan tanpa error. Nginx berhasil melakukan load balancing ke tiga web server, setiap web server dapat terhubung ke database MySQL, serta data database tersimpan secara permanen melalui Docker Volume. Selain itu komunikasi antar service menjadi lebih stabil karena konfigurasi jaringan telah sesuai dengan kebutuhan sistem.
+## Permasalahan 7
 
+### Gejala
+
+Container MySQL gagal dijalankan dan berhenti dengan status error.
+
+### Penyebab
+
+File `init.sql` masih mengandung sintaks markdown sehingga tidak dapat diproses oleh MySQL saat proses inisialisasi database.
+
+### Solusi
+
+Seluruh sintaks markdown dihapus sehingga file hanya berisi perintah SQL yang valid. Setelah diperbaiki, database berhasil dibuat dan container MySQL dapat berjalan dengan normal.
+
+---
+
+## Permasalahan 8
+
+### Gejala
+
+Container Nginx gagal dijalankan dan menampilkan pesan error:
+
+````
+unknown directive "```nginx"
+````
+
+### Penyebab
+
+File konfigurasi `nginx.conf` masih mengandung sintaks markdown yang tidak dikenali sebagai directive Nginx.
+
+### Solusi
+
+Seluruh sintaks markdown dihapus sehingga file hanya berisi konfigurasi Nginx yang valid. Setelah diperbaiki, Nginx berhasil membaca konfigurasi dan dapat dijalankan.
+
+---
+
+## Permasalahan 9
+
+### Gejala
+
+Container Nginx gagal dijalankan dengan pesan:
+
+```
+host not found in upstream "web11:80"
+```
+
+### Penyebab
+
+Terdapat kesalahan penulisan nama host pada konfigurasi upstream Nginx:
+
+```
+server web11:80;
+```
+
+Padahal nama container yang benar adalah:
+
+```
+server web1:80;
+```
+
+### Solusi
+
+Hostname diperbaiki menjadi:
+
+```
+server web1:80;
+```
+
+Setelah diperbaiki, Nginx berhasil melakukan resolusi hostname dan load balancer dapat berjalan dengan normal.
+
+---
+
+# Hasil Akhir
+
+### Gejala
+
+Sebelum dilakukan perbaikan, sebagian container gagal dijalankan sehingga layanan web dan load balancer tidak dapat diakses dengan baik.
+
+### Penyebab
+
+Terdapat beberapa kesalahan konfigurasi pada Docker Compose, konfigurasi jaringan, volume, file SQL, dan konfigurasi Nginx.
+
+### Solusi
+
+Seluruh kesalahan konfigurasi berhasil diperbaiki dan sistem dijalankan kembali menggunakan Docker Compose.
+
+Hasil pengujian menunjukkan bahwa seluruh container (`nginx-lb`, `web1`, `web2`, `web3`, dan `mysql-db`) berhasil berjalan dengan status **Up**. Pengujian load balancing menggunakan perintah:
+
+```
+for i in {1..10}; do curl -s localhost:8080 | grep "WEB SERVER"; done
+```
+
+menunjukkan hasil yang bergantian antara **WEB SERVER 1**, **WEB SERVER 2**, dan **WEB SERVER 3**. Hal ini membuktikan bahwa mekanisme load balancing Nginx dengan metode **round robin** telah berfungsi dengan baik dan seluruh layanan dapat beroperasi sesuai dengan kebutuhan sistem.
 
